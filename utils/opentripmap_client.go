@@ -1,9 +1,4 @@
 // utils/opentripmap_client.go
-// OpenTripMapClient is a reusable HTTP client for the OpenTripMap API.
-// Docs: https://opentripmap.io/docs
-//
-// API key is loaded from the OPENTRIPMAP_API_KEY environment variable.
-// Transformation into application models.Attraction is done by AttractionService.
 package utils
 
 import (
@@ -13,20 +8,18 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 )
 
 const openTripMapBaseURL = "https://api.opentripmap.com/0.1/en"
 
-// OpenTripMapClient wraps an http.Client for the OpenTripMap API.
 type OpenTripMapClient struct {
 	httpClient *http.Client
 	baseURL    string
 	apiKey     string
 }
 
-// NewOpenTripMapClient creates a client that reads OPENTRIPMAP_API_KEY from env.
-// Returns an error if the API key is not set.
 func NewOpenTripMapClient() (*OpenTripMapClient, error) {
 	apiKey := os.Getenv("OPENTRIPMAP_API_KEY")
 	if apiKey == "" {
@@ -41,33 +34,30 @@ func NewOpenTripMapClient() (*OpenTripMapClient, error) {
 
 // --- Raw API response types ---
 
-// RawAttractionList is the JSON response from the /places/radius endpoint.
 type RawAttractionList struct {
-	Type     string             `json:"type"`
+	Type     string                 `json:"type"`
 	Features []RawAttractionFeature `json:"features"`
 }
 
-// RawAttractionFeature represents one GeoJSON feature in the list response.
 type RawAttractionFeature struct {
-	Type string `json:"type"`
-	ID   string `json:"id"`
+	Type       string `json:"type"`
+	ID         string `json:"id"`
 	Properties struct {
-		XID  string `json:"xid"`
-		Name string `json:"name"`
-		Dist float64 `json:"dist"` // distance in meters from search center
-		Rate int    `json:"rate"`
-		Kinds string `json:"kinds"` // comma-separated category tags
+		XID   string  `json:"xid"`
+		Name  string  `json:"name"`
+		Dist  float64 `json:"dist"`
+		Rate  int     `json:"rate"`
+		Kinds string  `json:"kinds"`
 	} `json:"properties"`
 	Geometry struct {
 		Type        string    `json:"type"`
-		Coordinates []float64 `json:"coordinates"` // [longitude, latitude]
+		Coordinates []float64 `json:"coordinates"` // GeoJSON: [longitude, latitude]
 	} `json:"geometry"`
 }
 
-// RawAttractionDetail is the response from the /places/xid/:xid endpoint.
 type RawAttractionDetail struct {
-	XID  string `json:"xid"`
-	Name string `json:"name"`
+	XID   string `json:"xid"`
+	Name  string `json:"name"`
 	Kinds string `json:"kinds"`
 	Point struct {
 		Lon float64 `json:"lon"`
@@ -80,31 +70,35 @@ type RawAttractionDetail struct {
 	} `json:"info"`
 }
 
-// GetAttractionsByRadius fetches attractions within a given radius of lat/lon.
-//
-// Parameters:
-//   lat, lon — coordinates of the country capital or center point
-//   radius   — search radius in meters (max 50000 for free tier)
-//   limit    — maximum number of results to return
-//   kinds    — comma-separated category filter e.g. "interesting_places,historic"
+// SafeCoords extracts (lon, lat) from a GeoJSON coordinates slice.
+// Exported so AttractionService can use it directly instead of
+// duplicating the bounds check.
+// Returns (0, 0) if the slice has fewer than 2 elements.
+func SafeCoords(coords []float64) (lon, lat float64) {
+	if len(coords) < 2 {
+		return 0, 0
+	}
+	return coords[0], coords[1] // GeoJSON order: [longitude, latitude]
+}
+
 func (c *OpenTripMapClient) GetAttractionsByRadius(lat, lon float64, radius, limit int, kinds string) (*RawAttractionList, error) {
 	if kinds == "" {
 		kinds = "interesting_places,historic,cultural,museums,architecture,natural"
 	}
 
 	params := url.Values{}
-	params.Set("radius", fmt.Sprintf("%d", radius))
-	params.Set("lon", fmt.Sprintf("%f", lon))
-	params.Set("lat", fmt.Sprintf("%f", lat))
+	params.Set("radius", strconv.Itoa(radius))
+	params.Set("lon", strconv.FormatFloat(lon, 'f', -1, 64)) // full precision
+	params.Set("lat", strconv.FormatFloat(lat, 'f', -1, 64))
 	params.Set("kinds", kinds)
-	params.Set("limit", fmt.Sprintf("%d", limit))
-	params.Set("rate", "2")   // minimum rating threshold
+	params.Set("limit", strconv.Itoa(limit))
+	params.Set("rate", "2")
 	params.Set("format", "geojson")
 	params.Set("apikey", c.apiKey)
 
 	reqURL := fmt.Sprintf("%s/places/radius?%s", c.baseURL, params.Encode())
 
-	body, err := c.doGet(reqURL)
+	body, err := c.doGetWithRetry(reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -116,14 +110,17 @@ func (c *OpenTripMapClient) GetAttractionsByRadius(lat, lon float64, radius, lim
 	return &result, nil
 }
 
-// GetAttractionDetail fetches full details for a single attraction by its XID.
 func (c *OpenTripMapClient) GetAttractionDetail(xid string) (*RawAttractionDetail, error) {
 	if xid == "" {
 		return nil, fmt.Errorf("xid must not be empty")
 	}
-	reqURL := fmt.Sprintf("%s/places/xid/%s?apikey=%s", c.baseURL, xid, c.apiKey)
 
-	body, err := c.doGet(reqURL)
+	// apikey goes through params.Encode() so it doesn't appear raw in a logged URL string
+	params := url.Values{}
+	params.Set("apikey", c.apiKey)
+	reqURL := fmt.Sprintf("%s/places/xid/%s?%s", c.baseURL, xid, params.Encode())
+
+	body, err := c.doGetWithRetry(reqURL)
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +132,26 @@ func (c *OpenTripMapClient) GetAttractionDetail(xid string) (*RawAttractionDetai
 	return &detail, nil
 }
 
-// doGet is the shared internal HTTP GET helper.
-// Returns the raw response body bytes or a descriptive error.
+// doGetWithRetry attempts the request up to 2 times on 5xx errors.
+func (c *OpenTripMapClient) doGetWithRetry(reqURL string) ([]byte, error) {
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		body, err := c.doGet(reqURL)
+		if err == nil {
+			return body, nil
+		}
+		lastErr = err
+		// Only retry on server-side errors, not on 401/429/bad input
+		if isRetryable(err) && attempt == 0 {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		break
+	}
+	return nil, lastErr
+}
+
+// doGet performs a single HTTP GET and returns the body bytes.
 func (c *OpenTripMapClient) doGet(reqURL string) ([]byte, error) {
 	resp, err := c.httpClient.Get(reqURL)
 	if err != nil {
@@ -144,13 +159,14 @@ func (c *OpenTripMapClient) doGet(reqURL string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized {
+	switch resp.StatusCode {
+	case http.StatusUnauthorized:
 		return nil, fmt.Errorf("OpenTripMap API key is invalid or missing")
-	}
-	if resp.StatusCode == http.StatusTooManyRequests {
+	case http.StatusTooManyRequests:
 		return nil, fmt.Errorf("OpenTripMap rate limit exceeded; please try again later")
-	}
-	if resp.StatusCode != http.StatusOK {
+	case http.StatusOK:
+		// continue below
+	default:
 		return nil, fmt.Errorf("OpenTripMap API returned status %d", resp.StatusCode)
 	}
 
@@ -159,4 +175,25 @@ func (c *OpenTripMapClient) doGet(reqURL string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read OpenTripMap response body: %w", err)
 	}
 	return body, nil
+}
+
+// isRetryable returns true for transient server-side errors worth retrying.
+func isRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return len(msg) > 0 && (contains(msg, "status 5") || contains(msg, "request failed"))
+}
+
+func contains(s, sub string) bool {
+	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
+		func() bool {
+			for i := 0; i <= len(s)-len(sub); i++ {
+				if s[i:i+len(sub)] == sub {
+					return true
+				}
+			}
+			return false
+		}())
 }
