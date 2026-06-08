@@ -1,23 +1,51 @@
 // controllers/api/country.go
-// CountryAPIController handles JSON API routes for country data.
-// Full implementation in Phase 6.
+// CountryAPIController — JSON endpoints consumed by AJAX on /countries.
 package api
 
-import "github.com/beego/beego/v2/server/web"
+import (
+	"github.com/beego/beego/v2/server/web"
+	"github.com/robiulislam99/TravelSphere/services"
+	"github.com/robiulislam99/TravelSphere/utils"
+)
 
-// CountryAPIController serves JSON responses for country data.
 type CountryAPIController struct {
 	web.Controller
 }
 
 // GetAll handles GET /api/countries?search=...&region=...
 func (c *CountryAPIController) GetAll() {
-	c.Data["json"] = map[string]interface{}{"data": []interface{}{}, "message": "stub — Phase 6"}
-	c.ServeJSON()
+	search := c.GetString("search")
+	region := c.GetString("region")
+
+	if region != "" && !utils.IsValidRegion(region) {
+		utils.SendBadRequest(&c.Controller, "invalid region value")
+		return
+	}
+
+	countries, err := services.Countries().GetAll(search, region)
+	if err != nil {
+		utils.SendInternalError(&c.Controller)
+		return
+	}
+	utils.SendSuccess(&c.Controller, countries)
 }
 
 // GetBySlug handles GET /api/countries/:slug
 func (c *CountryAPIController) GetBySlug() {
-	c.Data["json"] = map[string]interface{}{"data": nil, "message": "stub — Phase 6"}
-	c.ServeJSON()
+	slug := c.Ctx.Input.Param(":slug")
+	if !utils.IsValidSlug(slug) {
+		utils.SendBadRequest(&c.Controller, "invalid slug format")
+		return
+	}
+
+	country, err := services.Countries().GetBySlug(slug)
+	if err != nil {
+		utils.SendInternalError(&c.Controller)
+		return
+	}
+	if country == nil {
+		utils.SendNotFound(&c.Controller, "country not found")
+		return
+	}
+	utils.SendSuccess(&c.Controller, country)
 }

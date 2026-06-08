@@ -1,21 +1,19 @@
 // controllers/api/dashboard.go
-// DashboardAPIController handles GET /api/dashboard/summary.
-// Full implementation in Phase 6.
+// DashboardAPIController — GET /api/dashboard/summary
 package api
 
-import "github.com/beego/beego/v2/server/web"
+import (
+	"github.com/beego/beego/v2/server/web"
+	"github.com/robiulislam99/TravelSphere/services"
+	"github.com/robiulislam99/TravelSphere/utils"
+)
 
-// DashboardAPIController serves the dashboard summary JSON.
 type DashboardAPIController struct {
 	web.Controller
 }
 
 // Summary handles GET /api/dashboard/summary
 func (c *DashboardAPIController) Summary() {
-	c.Data["json"] = map[string]interface{}{
-		"total":   0,
-		"planned": 0,
-		"visited": 0,
-	}
-	c.ServeJSON()
+	summary := services.Dashboard().GetSummary()
+	utils.SendSuccess(&c.Controller, summary)
 }
