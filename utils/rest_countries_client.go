@@ -1,4 +1,9 @@
 // utils/rest_countries_client.go
+// RestCountriesClient is a reusable HTTP client for the REST Countries v3.1 API.
+// Docs: https://restcountries.com/
+//
+// All methods return raw decoded API responses; transformation into
+// application models is done by CountryService (services/country_service.go).
 package utils
 
 import (
@@ -6,20 +11,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 )
 
 const restCountriesBaseURL = "https://restcountries.com/v3.1"
 
-const defaultFields = "name,cca2,cca3,capital,region,subregion,population,flags,flag,currencies,languages,latlng"
-
+// RestCountriesClient wraps an http.Client for the REST Countries API.
 type RestCountriesClient struct {
 	httpClient *http.Client
 	baseURL    string
 }
 
+// NewRestCountriesClient creates a client with a sensible default timeout.
 func NewRestCountriesClient() *RestCountriesClient {
 	return &RestCountriesClient{
 		httpClient: &http.Client{Timeout: 10 * time.Second},
@@ -28,75 +31,70 @@ func NewRestCountriesClient() *RestCountriesClient {
 }
 
 // --- Raw API response types ---
+// These mirror the REST Countries v3.1 JSON structure exactly.
+// CountryService maps these into application models.Country structs.
 
+// RawCountry is the raw JSON shape returned by the REST Countries API.
 type RawCountry struct {
 	Name struct {
 		Common   string `json:"common"`
 		Official string `json:"official"`
 	} `json:"name"`
-	CCA2      string   `json:"cca2"`
-	CCA3      string   `json:"cca3"`
-	Capital   []string `json:"capital"`
-	Region    string   `json:"region"`
-	Subregion string   `json:"subregion"`
-	Population int64   `json:"population"`
-	Flags struct {
+	CCA2    string   `json:"cca2"`
+	CCA3    string   `json:"cca3"`
+	Capital []string `json:"capital"`
+	Region  string   `json:"region"`
+	Subregion string `json:"subregion"`
+	Population int64  `json:"population"`
+	Flags   struct {
 		PNG string `json:"png"`
 		SVG string `json:"svg"`
 	} `json:"flags"`
-	Flag       string `json:"flag"`
+	Flag      string                        `json:"flag"` // emoji
 	Currencies map[string]struct {
 		Name   string `json:"name"`
 		Symbol string `json:"symbol"`
 	} `json:"currencies"`
-	Languages map[string]string `json:"languages"`
-	Latlng    []float64         `json:"latlng"`
+	Languages  map[string]string             `json:"languages"`
+	Latlng     []float64                     `json:"latlng"`
 }
 
-// GetAll fetches all countries.
-// GET /v3.1/all?fields=...
+// GetAll fetches all countries from the REST Countries API.
+// Returns a slice of raw country data and any error encountered.
 func (c *RestCountriesClient) GetAll() ([]RawCountry, error) {
-	u := fmt.Sprintf("%s/all?fields=%s", c.baseURL, defaultFields)
-	return c.fetchCountries(u)
+	// Request only the fields we need to keep the response lean
+	fields := "name,cca2,cca3,capital,region,subregion,population,flags,flag,currencies,languages,latlng"
+	url := fmt.Sprintf("%s/all?fields=%s", c.baseURL, fields)
+	return c.fetchCountries(url)
 }
 
-// GetByName searches by common or official country name (partial match).
-// GET /v3.1/name/{name}
+// GetByName fetches countries matching a name query (partial match supported).
+// Returns an empty slice (not an error) when no countries match.
 func (c *RestCountriesClient) GetByName(name string) ([]RawCountry, error) {
 	if name == "" {
 		return []RawCountry{}, nil
 	}
-	u := fmt.Sprintf("%s/name/%s?fields=%s", c.baseURL, url.PathEscape(name), defaultFields)
-	countries, err := c.fetchCountries(u)
+	fields := "name,cca2,cca3,capital,region,subregion,population,flags,flag,currencies,languages,latlng"
+	url := fmt.Sprintf("%s/name/%s?fields=%s", c.baseURL, name, fields)
+
+	countries, err := c.fetchCountries(url)
 	if err != nil {
-		// 404 means no match — not a real error.
+		// REST Countries returns 404 when no match — treat as empty result
 		return []RawCountry{}, nil
 	}
 	return countries, nil
 }
 
-// GetByFullName searches by exact full name (common or official).
-// GET /v3.1/name/{name}?fullText=true
-func (c *RestCountriesClient) GetByFullName(name string) ([]RawCountry, error) {
-	if name == "" {
-		return []RawCountry{}, nil
-	}
-	u := fmt.Sprintf("%s/name/%s?fullText=true&fields=%s", c.baseURL, url.PathEscape(name), defaultFields)
-	countries, err := c.fetchCountries(u)
-	if err != nil {
-		return []RawCountry{}, nil
-	}
-	return countries, nil
-}
-
-// GetByCode searches by a single cca2, cca3, ccn3, or cioc code.
-// GET /v3.1/alpha/{code}
+// GetByCode fetches a single country by its alpha-2 or alpha-3 code.
+// e.g. "BD" or "BGD" for Bangladesh.
 func (c *RestCountriesClient) GetByCode(code string) (*RawCountry, error) {
 	if code == "" {
 		return nil, fmt.Errorf("country code must not be empty")
 	}
-	u := fmt.Sprintf("%s/alpha/%s?fields=%s", c.baseURL, url.PathEscape(code), defaultFields)
-	countries, err := c.fetchCountries(u)
+	fields := "name,cca2,cca3,capital,region,subregion,population,flags,flag,currencies,languages,latlng"
+	url := fmt.Sprintf("%s/alpha/%s?fields=%s", c.baseURL, code, fields)
+
+	countries, err := c.fetchCountries(url)
 	if err != nil {
 		return nil, err
 	}
@@ -106,98 +104,10 @@ func (c *RestCountriesClient) GetByCode(code string) (*RawCountry, error) {
 	return &countries[0], nil
 }
 
-// GetByCodes searches by multiple country codes at once.
-// GET /v3.1/alpha?codes={code},{code}
-func (c *RestCountriesClient) GetByCodes(codes []string) ([]RawCountry, error) {
-	if len(codes) == 0 {
-		return []RawCountry{}, nil
-	}
-	joined := url.QueryEscape(strings.Join(codes, ","))
-	u := fmt.Sprintf("%s/alpha?codes=%s&fields=%s", c.baseURL, joined, defaultFields)
-	return c.fetchCountries(u)
-}
-
-// GetByCurrency searches by currency code or name.
-// GET /v3.1/currency/{currency}
-func (c *RestCountriesClient) GetByCurrency(currency string) ([]RawCountry, error) {
-	if currency == "" {
-		return []RawCountry{}, nil
-	}
-	u := fmt.Sprintf("%s/currency/%s?fields=%s", c.baseURL, url.PathEscape(currency), defaultFields)
-	return c.fetchCountries(u)
-}
-
-// GetByLanguage searches by language code or name.
-// GET /v3.1/lang/{language}
-func (c *RestCountriesClient) GetByLanguage(language string) ([]RawCountry, error) {
-	if language == "" {
-		return []RawCountry{}, nil
-	}
-	u := fmt.Sprintf("%s/lang/%s?fields=%s", c.baseURL, url.PathEscape(language), defaultFields)
-	return c.fetchCountries(u)
-}
-
-// GetByCapital searches by capital city name.
-// GET /v3.1/capital/{capital}
-func (c *RestCountriesClient) GetByCapital(capital string) ([]RawCountry, error) {
-	if capital == "" {
-		return []RawCountry{}, nil
-	}
-	u := fmt.Sprintf("%s/capital/%s?fields=%s", c.baseURL, url.PathEscape(capital), defaultFields)
-	return c.fetchCountries(u)
-}
-
-// GetByRegion filters countries by region (e.g. "europe", "asia").
-// GET /v3.1/region/{region}
-func (c *RestCountriesClient) GetByRegion(region string) ([]RawCountry, error) {
-	if region == "" {
-		return []RawCountry{}, nil
-	}
-	u := fmt.Sprintf("%s/region/%s?fields=%s", c.baseURL, url.PathEscape(region), defaultFields)
-	return c.fetchCountries(u)
-}
-
-// GetBySubregion filters countries by subregion (e.g. "Northern Europe").
-// GET /v3.1/subregion/{subregion}
-func (c *RestCountriesClient) GetBySubregion(subregion string) ([]RawCountry, error) {
-	if subregion == "" {
-		return []RawCountry{}, nil
-	}
-	u := fmt.Sprintf("%s/subregion/%s?fields=%s", c.baseURL, url.PathEscape(subregion), defaultFields)
-	return c.fetchCountries(u)
-}
-
-// GetByDemonym searches by demonym (e.g. "peruvian").
-// GET /v3.1/demonym/{demonym}
-func (c *RestCountriesClient) GetByDemonym(demonym string) ([]RawCountry, error) {
-	if demonym == "" {
-		return []RawCountry{}, nil
-	}
-	u := fmt.Sprintf("%s/demonym/%s?fields=%s", c.baseURL, url.PathEscape(demonym), defaultFields)
-	return c.fetchCountries(u)
-}
-
-// GetByTranslation searches by any translated country name (e.g. "alemania").
-// GET /v3.1/translation/{translation}
-func (c *RestCountriesClient) GetByTranslation(translation string) ([]RawCountry, error) {
-	if translation == "" {
-		return []RawCountry{}, nil
-	}
-	u := fmt.Sprintf("%s/translation/%s?fields=%s", c.baseURL, url.PathEscape(translation), defaultFields)
-	return c.fetchCountries(u)
-}
-
-// GetIndependent returns all independent or non-independent countries.
-// GET /v3.1/independent?status=true
-func (c *RestCountriesClient) GetIndependent(status bool) ([]RawCountry, error) {
-	u := fmt.Sprintf("%s/independent?status=%t&fields=%s", c.baseURL, status, defaultFields)
-	return c.fetchCountries(u)
-}
-
-// fetchCountries is the shared internal helper for all endpoints.
-// Every REST Countries endpoint returns a JSON array — including /alpha/:code.
-func (c *RestCountriesClient) fetchCountries(u string) ([]RawCountry, error) {
-	resp, err := c.httpClient.Get(u)
+// fetchCountries is the shared internal helper that performs the HTTP GET,
+// reads the body, and decodes the JSON array of countries.
+func (c *RestCountriesClient) fetchCountries(url string) ([]RawCountry, error) {
+	resp, err := c.httpClient.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("rest countries request failed: %w", err)
 	}
@@ -206,6 +116,7 @@ func (c *RestCountriesClient) fetchCountries(u string) ([]RawCountry, error) {
 	if resp.StatusCode == http.StatusNotFound {
 		return []RawCountry{}, nil
 	}
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("rest countries API returned status %d", resp.StatusCode)
 	}
@@ -219,5 +130,6 @@ func (c *RestCountriesClient) fetchCountries(u string) ([]RawCountry, error) {
 	if err := json.Unmarshal(body, &countries); err != nil {
 		return nil, fmt.Errorf("failed to decode REST countries response: %w", err)
 	}
+
 	return countries, nil
 }
