@@ -1,12 +1,11 @@
 // TravelSphere — main.js
 // Shared utilities loaded on every page
-
 'use strict';
 
 // ── Mobile nav toggle ──────────────────────────────────────
 (function () {
     const toggle = document.querySelector('.nav-toggle');
-    const nav = document.querySelector('.site-nav');
+    const nav    = document.querySelector('.site-nav');
     if (!toggle || !nav) return;
 
     toggle.addEventListener('click', function () {
@@ -14,7 +13,6 @@
         toggle.setAttribute('aria-expanded', String(isOpen));
     });
 
-    // Close nav when clicking outside
     document.addEventListener('click', function (e) {
         if (!nav.contains(e.target) && !toggle.contains(e.target)) {
             nav.classList.remove('is-open');
@@ -24,64 +22,73 @@
 })();
 
 // ── Shared AJAX helper ─────────────────────────────────────
-// Usage:
-//   tsAjax({ url: '/api/countries', method: 'GET', data: {search: 'bang'} })
-//     .then(json => console.log(json))
-//     .catch(err => console.error(err));
 window.tsAjax = function (opts) {
     const method = (opts.method || 'GET').toUpperCase();
     let url = opts.url;
 
-    // Append query params for GET requests
     if (method === 'GET' && opts.data) {
         const params = new URLSearchParams(opts.data);
         url = url + '?' + params.toString();
     }
 
-    const fetchOpts = {
-        method: method,
-        headers: { 'Content-Type': 'application/json' },
-    };
+    const headers = {};
 
-    // Add auth token from meta tag if present
-    const authMeta = document.querySelector('meta[name="auth-token"]');
-    if (authMeta) {
-        fetchOpts.headers['Authorization'] = 'Bearer ' + authMeta.content;
+    // Only set Content-Type for requests that have a body
+    if (method !== 'GET') {
+        headers['Content-Type'] = 'application/json';
     }
 
-    // Attach body for non-GET requests
+    const authMeta = document.querySelector('meta[name="auth-token"]');
+    if (authMeta) {
+        headers['Authorization'] = 'Bearer ' + authMeta.content;
+    }
+
+    const fetchOpts = { method: method, headers: headers };
+
     if (method !== 'GET' && opts.data) {
         fetchOpts.body = JSON.stringify(opts.data);
     }
 
-    return fetch(url, fetchOpts).then(function (res) {
-        return res.json().then(function (json) {
-            if (!res.ok) {
-                // Attach server message to the thrown error
-                const err = new Error(json.message || 'Request failed');
-                err.status = res.status;
-                err.data = json;
-                throw err;
+    // Abort after 10 seconds to prevent infinite spinner
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(function () { controller.abort(); }, 10000);
+    fetchOpts.signal = controller.signal;
+
+    return fetch(url, fetchOpts)
+        .then(function (res) {
+            clearTimeout(timeoutId);
+            return res.json().then(function (json) {
+                if (!res.ok) {
+                    const err     = new Error(json.message || 'Request failed');
+                    err.status    = res.status;
+                    err.data      = json;
+                    throw err;
+                }
+                return json;
+            });
+        })
+        .catch(function (err) {
+            clearTimeout(timeoutId);
+            // Distinguish abort/timeout from other network errors
+            if (err.name === 'AbortError') {
+                throw new Error('Request timed out. Please try again.');
             }
-            return json;
+            throw err;
         });
-    });
 };
 
 // ── Spinner helper ─────────────────────────────────────────
-// Shows a loading spinner inside a target container
 window.tsShowSpinner = function (container) {
     container.innerHTML =
         '<div class="loading-state"><span class="spinner"></span> Loading...</div>';
 };
 
 // ── Alert helper ───────────────────────────────────────────
-// Injects a success or error alert into a target container
 // type: 'success' | 'error'
 window.tsShowAlert = function (container, message, type) {
     type = type || 'success';
     container.innerHTML =
-        '<div class="alert alert-' + type + '">' + escapeHtml(message) + '</div>';
+        '<div class="alert alert--' + type + '">' + escapeHtml(message) + '</div>';
 };
 
 // ── HTML escape utility ────────────────────────────────────

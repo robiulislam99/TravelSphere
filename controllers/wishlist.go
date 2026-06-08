@@ -10,14 +10,15 @@ type WishlistController struct {
 
 func (c *WishlistController) Prepare() {
 	c.BaseController.Prepare()
-	c.Data["Title"]      = "My Wishlist"
+	c.Data["Title"] = "My Wishlist"
 	c.Data["ActivePage"] = "wishlist"
 }
 
 func (c *WishlistController) Get() {
 	entries := services.Wishlist().GetAll()
 	c.Data["WishlistEntries"] = entries
+	c.Data["PageScript"] = "wishlist.js"
 
-	c.Layout  = "layout/base.tpl"
+	c.Layout = "layout/base.tpl"
 	c.TplName = "pages/wishlist.tpl"
 }

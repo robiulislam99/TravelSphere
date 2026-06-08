@@ -10,7 +10,7 @@ type DashboardController struct {
 
 func (c *DashboardController) Prepare() {
 	c.BaseController.Prepare()
-	c.Data["Title"]      = "Dashboard"
+	c.Data["Title"] = "Dashboard"
 	c.Data["ActivePage"] = "dashboard"
 }
 
@@ -18,9 +18,10 @@ func (c *DashboardController) Get() {
 	summary := services.Dashboard().GetSummary()
 	entries := services.Wishlist().GetAll()
 
-	c.Data["Summary"]         = summary
+	c.Data["Summary"] = summary
 	c.Data["WishlistEntries"] = entries
+	c.Data["PageScript"] = "dashboard.js"
 
-	c.Layout  = "layout/base.tpl"
+	c.Layout = "layout/base.tpl"
 	c.TplName = "pages/dashboard.tpl"
 }

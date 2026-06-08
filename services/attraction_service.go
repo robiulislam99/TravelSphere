@@ -1,6 +1,4 @@
 // services/attraction_service.go
-// AttractionService fetches and transforms tourist attraction data
-// from the OpenTripMap API. Falls back gracefully if the API is unavailable.
 package services
 
 import (
@@ -11,14 +9,10 @@ import (
 	"github.com/robiulislam99/TravelSphere/utils"
 )
 
-// AttractionService provides attraction lookup by geographic coordinates.
 type AttractionService struct {
 	client *utils.OpenTripMapClient
 }
 
-// NewAttractionService creates an AttractionService.
-// Returns a service with a nil client if the API key is missing —
-// all methods degrade gracefully returning empty slices instead of crashing.
 func NewAttractionService() *AttractionService {
 	client, err := utils.NewOpenTripMapClient()
 	if err != nil {
@@ -28,15 +22,12 @@ func NewAttractionService() *AttractionService {
 	return &AttractionService{client: client}
 }
 
-// GetByCoords fetches up to `limit` attractions near the given coordinates.
-// radius is in meters. Returns an empty slice (not an error) on API failure
-// so pages still render without attractions when the API is down.
 func (s *AttractionService) GetByCoords(lat, lon float64, radius, limit int) ([]models.Attraction, error) {
 	if s.client == nil {
 		return []models.Attraction{}, nil
 	}
 	if radius <= 0 {
-		radius = 10000 // default 10 km
+		radius = 10000
 	}
 	if limit <= 0 {
 		limit = 12
@@ -45,40 +36,63 @@ func (s *AttractionService) GetByCoords(lat, lon float64, radius, limit int) ([]
 	raw, err := s.client.GetAttractionsByRadius(lat, lon, radius, limit, "")
 	if err != nil {
 		log.Printf("[AttractionService] GetByCoords error: %v", err)
-		return []models.Attraction{}, nil // graceful degradation
+		return []models.Attraction{}, nil
 	}
 
 	results := make([]models.Attraction, 0, len(raw.Features))
 	for _, f := range raw.Features {
 		name := strings.TrimSpace(f.Properties.Name)
 		if name == "" {
-			continue // skip unnamed attractions
+			continue
 		}
-		lon, lat := 0.0, 0.0
+
+		// Use var to avoid shadowing the outer lat/lon params
+		var featLon, featLat float64
 		if len(f.Geometry.Coordinates) == 2 {
-			lon = f.Geometry.Coordinates[0]
-			lat = f.Geometry.Coordinates[1]
+			featLon = f.Geometry.Coordinates[0] // GeoJSON: [lon, lat]
+			featLat = f.Geometry.Coordinates[1]
 		}
+
 		results = append(results, models.Attraction{
 			XID:         f.Properties.XID,
 			Name:        name,
 			Kinds:       f.Properties.Kinds,
 			PrimaryKind: utils.PrimaryKind(f.Properties.Kinds),
 			Distance:    f.Properties.Dist,
-			Latitude:    lat,
-			Longitude:   lon,
+			Latitude:    featLat,
+			Longitude:   featLon,
 		})
 	}
 	return results, nil
 }
 
-// GetForHomePage returns a small set of attractions across popular coordinates
-// for display on the home page. Uses a few hardcoded world landmarks.
+// homePageSeeds are fallback locations tried in order until one returns results.
+var homePageSeeds = []struct {
+	label    string
+	lat, lon float64
+}{
+	{"Paris", 48.8584, 2.2945},
+	{"Tokyo", 35.6762, 139.6503},
+	{"New York", 40.7128, -74.0060},
+}
+
 func (s *AttractionService) GetForHomePage() []models.Attraction {
 	if s.client == nil {
 		return []models.Attraction{}
 	}
-	// Paris — Eiffel Tower area
-	attractions, _ := s.GetByCoords(48.8584, 2.2945, 5000, 4)
-	return attractions
+
+	for _, seed := range homePageSeeds {
+		attractions, err := s.GetByCoords(seed.lat, seed.lon, 5000, 4)
+		if err != nil {
+			log.Printf("[AttractionService] GetForHomePage error for %s: %v", seed.label, err)
+			continue
+		}
+		if len(attractions) > 0 {
+			return attractions
+		}
+		log.Printf("[AttractionService] GetForHomePage: no results for %s, trying next seed", seed.label)
+	}
+
+	log.Printf("[AttractionService] GetForHomePage: all seeds exhausted, returning empty")
+	return []models.Attraction{}
 }

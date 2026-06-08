@@ -1,7 +1,8 @@
 // controllers/country.go
 // CountryController handles:
-//   GET /countries        → List()   — Country Explorer SSR page
-//   GET /countries/:slug  → Detail() — Destination detail SSR page
+//
+//	GET /countries        → List()   — Country Explorer SSR page
+//	GET /countries/:slug  → Detail() — Destination detail SSR page
 package controllers
 
 import (
@@ -32,12 +33,14 @@ func (c *CountryController) List() {
 		countries = nil
 	}
 
-	c.Data["Title"]        = "Explore Countries"
-	c.Data["Countries"]    = countries
-	c.Data["SearchQuery"]  = search
+	c.Data["Title"] = "Explore Countries"
+	c.Data["Countries"] = countries
+	c.Data["SearchQuery"] = search
 	c.Data["RegionFilter"] = region
 
-	c.Layout  = "layout/base.tpl"
+	c.Data["PageScript"] = "countries.js"
+
+	c.Layout = "layout/base.tpl"
 	c.TplName = "pages/countries.tpl"
 }
 
@@ -46,7 +49,7 @@ func (c *CountryController) Detail() {
 	slug := c.Ctx.Input.Param(":slug")
 	if slug == "" {
 		c.Ctx.Output.SetStatus(http.StatusNotFound)
-		c.Layout  = "layout/base.tpl"
+		c.Layout = "layout/base.tpl"
 		c.TplName = "pages/404.tpl"
 		return
 	}
@@ -59,8 +62,8 @@ func (c *CountryController) Detail() {
 	// Unknown slug → 404
 	if country == nil {
 		c.Ctx.Output.SetStatus(http.StatusNotFound)
-		c.Data["Title"]  = "Not Found"
-		c.Layout  = "layout/base.tpl"
+		c.Data["Title"] = "Not Found"
+		c.Layout = "layout/base.tpl"
 		c.TplName = "pages/404.tpl"
 		return
 	}
@@ -76,11 +79,12 @@ func (c *CountryController) Detail() {
 		weather, _ = ws.GetCurrent(country.Capital)
 	}
 
-	c.Data["Title"]       = country.Name
-	c.Data["Country"]     = country
+	c.Data["Title"] = country.Name
+	c.Data["Country"] = country
 	c.Data["Attractions"] = attractions
-	c.Data["Weather"]     = weather
+	c.Data["Weather"] = weather
+	c.Data["PageScript"]  = "destination.js"
 
-	c.Layout  = "layout/base.tpl"
+	c.Layout = "layout/base.tpl"
 	c.TplName = "pages/destination.tpl"
 }
