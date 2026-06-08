@@ -1,58 +1,86 @@
 // controllers/country.go
-// CountryController handles SSR routes:
-//   GET /countries        → List() renders countries.tpl
-//   GET /countries/:slug  → Detail() renders destination.tpl
-//
-// Full implementation with real service calls comes in Phase 5.
+// CountryController handles:
+//   GET /countries        → List()   — Country Explorer SSR page
+//   GET /countries/:slug  → Detail() — Destination detail SSR page
 package controllers
 
-// CountryController handles the Country Explorer and Destination Detail pages.
+import (
+	"log"
+	"net/http"
+
+	"github.com/robiulislam99/TravelSphere/services"
+)
+
 type CountryController struct {
 	BaseController
 }
 
-// Prepare sets shared template data for country pages.
 func (c *CountryController) Prepare() {
 	c.BaseController.Prepare()
 	c.Data["ActivePage"] = "countries"
 }
 
-// List renders GET /countries — the Country Explorer page.
-// TODO (Phase 5): call CountryService.SearchCountries and pass results.
+// List renders GET /countries with a server-side rendered country grid.
+// Reads optional ?search= and ?region= query params for initial SSR filter.
 func (c *CountryController) List() {
-	c.Data["Title"] = "Explore Countries"
-	c.Data["Countries"] = []interface{}{}
-	c.Data["SearchQuery"] = c.GetString("search")
-	c.Data["RegionFilter"] = c.GetString("region")
+	search := c.GetString("search")
+	region := c.GetString("region")
 
-	c.Layout = "layout/base.tpl"
+	countries, err := services.Countries().GetAll(search, region)
+	if err != nil {
+		log.Printf("[CountryController] GetAll error: %v", err)
+		countries = nil
+	}
+
+	c.Data["Title"]        = "Explore Countries"
+	c.Data["Countries"]    = countries
+	c.Data["SearchQuery"]  = search
+	c.Data["RegionFilter"] = region
+
+	c.Layout  = "layout/base.tpl"
 	c.TplName = "pages/countries.tpl"
 }
 
-// Detail renders GET /countries/:slug — the Destination Detail page.
-// TODO (Phase 5): parse slug, call CountryService.GetBySlug + AttractionService.
+// Detail renders GET /countries/:slug with full country info + attractions.
 func (c *CountryController) Detail() {
 	slug := c.Ctx.Input.Param(":slug")
 	if slug == "" {
-		c.Abort("404")
+		c.Ctx.Output.SetStatus(http.StatusNotFound)
+		c.Layout  = "layout/base.tpl"
+		c.TplName = "pages/404.tpl"
 		return
 	}
 
-	c.Data["Title"] = slug
-	c.Data["Country"] = map[string]interface{}{
-		"Name":                slug,
-		"Slug":                slug,
-		"FlagURL":             "",
-		"Capital":             "—",
-		"Region":              "—",
-		"Subregion":           "—",
-		"FormattedPopulation": "—",
-		"CurrencyDisplay":     "—",
-		"LanguageDisplay":     "—",
+	country, err := services.Countries().GetBySlug(slug)
+	if err != nil {
+		log.Printf("[CountryController] GetBySlug(%s) error: %v", slug, err)
 	}
-	c.Data["Attractions"] = []interface{}{}
-	c.Data["Weather"] = nil
 
-	c.Layout = "layout/base.tpl"
+	// Unknown slug → 404
+	if country == nil {
+		c.Ctx.Output.SetStatus(http.StatusNotFound)
+		c.Data["Title"]  = "Not Found"
+		c.Layout  = "layout/base.tpl"
+		c.TplName = "pages/404.tpl"
+		return
+	}
+
+	// Fetch attractions near country centre (lat/lon from model)
+	attractions, _ := services.Attractions().GetByCoords(
+		country.Latitude, country.Longitude, 10000, 12,
+	)
+
+	// Fetch weather (bonus) — nil when key not set
+	var weather interface{}
+	if ws := services.Weather(); ws != nil {
+		weather, _ = ws.GetCurrent(country.Capital)
+	}
+
+	c.Data["Title"]       = country.Name
+	c.Data["Country"]     = country
+	c.Data["Attractions"] = attractions
+	c.Data["Weather"]     = weather
+
+	c.Layout  = "layout/base.tpl"
 	c.TplName = "pages/destination.tpl"
 }
