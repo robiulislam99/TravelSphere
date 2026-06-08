@@ -5,6 +5,7 @@
 package services
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -98,6 +99,7 @@ func (s *CountryService) GetFeatured() ([]models.CountryListItem, error) {
 // --- Private transformation helpers ---
 
 // toCountry converts a RawCountry into a full models.Country.
+
 func (s *CountryService) toCountry(r utils.RawCountry) models.Country {
 	capital := ""
 	if len(r.Capital) > 0 {
@@ -107,6 +109,21 @@ func (s *CountryService) toCountry(r utils.RawCountry) models.Country {
 	lat, lon := 0.0, 0.0
 	if len(r.Latlng) == 2 {
 		lat, lon = r.Latlng[0], r.Latlng[1]
+	}
+
+	// Build currency display string directly here
+	// to avoid anonymous struct type mismatch with formatter
+	currencyParts := []string{}
+	for code, cur := range r.Currencies {
+		if cur.Name != "" {
+			currencyParts = append(currencyParts, fmt.Sprintf("%s (%s)", code, cur.Name))
+		} else {
+			currencyParts = append(currencyParts, code)
+		}
+	}
+	currencyDisplay := "N/A"
+	if len(currencyParts) > 0 {
+		currencyDisplay = strings.Join(currencyParts, ", ")
 	}
 
 	return models.Country{
@@ -121,7 +138,7 @@ func (s *CountryService) toCountry(r utils.RawCountry) models.Country {
 		FormattedPopulation: utils.FormatPopulation(r.Population),
 		FlagURL:             r.Flags.PNG,
 		FlagEmoji:           r.Flag,
-		CurrencyDisplay:     utils.FormatCurrencies(r.Currencies),
+		CurrencyDisplay:     currencyDisplay,
 		LanguageDisplay:     utils.FormatLanguages(r.Languages),
 		Latitude:            lat,
 		Longitude:           lon,
