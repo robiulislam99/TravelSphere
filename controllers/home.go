@@ -14,7 +14,7 @@ type HomeController struct {
 
 func (c *HomeController) Prepare() {
 	c.BaseController.Prepare()
-	c.Data["Title"]      = "Discover Your Next Adventure"
+	c.Data["Title"] = "Discover Your Next Adventure"
 	c.Data["ActivePage"] = "home"
 }
 
@@ -29,9 +29,10 @@ func (c *HomeController) Get() {
 	// Popular attractions — already returns empty slice on failure
 	attractions := services.Attractions().GetForHomePage()
 
-	c.Data["FeaturedCountries"]   = featured
-	c.Data["PopularAttractions"]  = attractions
+	c.Data["FeaturedCountries"] = featured
+	c.Data["PopularAttractions"] = attractions
+	c.Data["PageScript"] = "home.js"
 
-	c.Layout  = "layout/base.tpl"
+	c.Layout = "layout/base.tpl"
 	c.TplName = "pages/home.tpl"
 }

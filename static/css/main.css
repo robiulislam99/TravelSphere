@@ -559,3 +559,53 @@ tbody tr:hover { background-color: var(--color-bg-muted); }
     .footer-inner { grid-template-columns: 1fr; gap: 1.5rem; }
     .page-hero__title { font-size: 1.5rem; }
 }
+
+.search-suggestions {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 0.5px solid var(--color-border-secondary);
+    border-radius: var(--border-radius-md);
+    overflow: hidden;
+    z-index: 100;
+    max-height: 320px;
+    overflow-y: auto;
+    color: black;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    text-decoration: none;
+    color: var(--color-text-primary);
+    font-size: 14px;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item:hover,
+.suggestion-item.is-active {
+    background: var(--color-background-secondary);
+}
+
+.suggestion-name {
+    font-size: 14px;
+    color: var(--color-text-primary);
+}
+
+.suggestion-capital {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+}
+
+.suggestion-empty {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}

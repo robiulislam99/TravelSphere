@@ -4,19 +4,20 @@
         <p class="page-hero__subtitle">Explore countries, find attractions, and build your travel wishlist.</p>
 
         <div class="search-row" style="margin-top:1.5rem;">
-            <input
-                type="text"
-                id="home-search"
-                class="form-control"
-                placeholder="Search destinations..."
-                autocomplete="off"
-                aria-label="Search destinations"
-                style="max-width:480px; font-size:1rem;"
-            >
+            <div style="position:relative; max-width:480px;">
+                <input
+                    type="text"
+                    id="home-search"
+                    class="form-control"
+                    placeholder="Search destinations..."
+                    autocomplete="off"
+                    aria-label="Search destinations"
+                    style="font-size:1rem; width:100%;"
+                >
+                <div id="search-suggestions" class="search-suggestions" hidden></div>
+            </div>
         </div>
 
-        <!-- AJAX partial: search suggestions -->
-        <div id="search-suggestions" style="margin-top:0.75rem;"></div>
     </div>
 </section>
 
