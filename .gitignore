@@ -1,0 +1,26 @@
+# Environment variables — never commit secrets
+.env
+
+# Compiled binaries
+travelsphere
+*.exe
+*.out
+
+# Go build cache
+vendor/
+
+# IDE / editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Test output
+*.test
+coverage.out
+coverage.html
+
+# Log files
+*.log
+logs/
