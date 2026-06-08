@@ -1,27 +1,37 @@
 // controllers/home.go
-// HomeController handles GET / — the home page.
-// Renders home.tpl with featured countries and popular attractions.
-// Full implementation comes in Phase 5.
+// HomeController handles GET / — home page with featured countries + attractions.
 package controllers
 
-// HomeController handles the home page SSR route.
+import (
+	"log"
+
+	"github.com/robiulislam99/TravelSphere/services"
+)
+
 type HomeController struct {
 	BaseController
 }
 
-// Prepare sets page-level template data before Get() runs.
 func (c *HomeController) Prepare() {
 	c.BaseController.Prepare()
-	c.Data["Title"] = "Home"
+	c.Data["Title"]      = "Discover Your Next Adventure"
 	c.Data["ActivePage"] = "home"
 }
 
-// Get renders the home page with featured countries and attractions.
-// TODO (Phase 5): inject real data from CountryService and AttractionService.
 func (c *HomeController) Get() {
-	c.Data["FeaturedCountries"] = []interface{}{}
-	c.Data["PopularAttractions"] = []interface{}{}
+	// Featured countries — degrade gracefully on API failure
+	featured, err := services.Countries().GetFeatured()
+	if err != nil {
+		log.Printf("[HomeController] GetFeatured error: %v", err)
+		featured = nil
+	}
 
-	c.Layout = "layout/base.tpl"
+	// Popular attractions — already returns empty slice on failure
+	attractions := services.Attractions().GetForHomePage()
+
+	c.Data["FeaturedCountries"]   = featured
+	c.Data["PopularAttractions"]  = attractions
+
+	c.Layout  = "layout/base.tpl"
 	c.TplName = "pages/home.tpl"
 }
