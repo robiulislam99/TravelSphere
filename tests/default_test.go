@@ -9,7 +9,7 @@ import (
 
     "github.com/beego/beego/v2/core/logs"
 
-	_ "TravelSphere/routers"
+	_ "github.com/robiulislam99/TravelSphere/routers"
 
 	beego "github.com/beego/beego/v2/server/web"
 	. "github.com/smartystreets/goconvey/convey"
