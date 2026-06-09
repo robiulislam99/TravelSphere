@@ -21,6 +21,7 @@ vendor/
 *.test
 coverage.out
 coverage.html
+coverage_report.txt
 
 # Log files
 *.log
