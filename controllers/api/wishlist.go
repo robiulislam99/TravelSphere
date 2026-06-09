@@ -1,87 +1,88 @@
-// controllers/api/wishlist.go
-// WishlistAPIController — full CRUD JSON endpoints for the wishlist.
 package api
 
 import (
-	"encoding/json"
+    "encoding/json"
 
-	"github.com/beego/beego/v2/server/web"
-	"github.com/robiulislam99/TravelSphere/models"
-	"github.com/robiulislam99/TravelSphere/services"
-	"github.com/robiulislam99/TravelSphere/utils"
+    "github.com/beego/beego/v2/server/web"
+    "github.com/robiulislam99/TravelSphere/models"
+    "github.com/robiulislam99/TravelSphere/services"
+    "github.com/robiulislam99/TravelSphere/utils"
 )
 
 type WishlistAPIController struct {
-	web.Controller
+    web.Controller
 }
 
-// GetAll handles GET /api/wishlist
+// getUsername extracts the session username or returns empty string.
+func (c *WishlistAPIController) getUsername() string {
+    u := c.GetSession("username")
+    if u == nil {
+        return ""
+    }
+    return u.(string)
+}
+
 func (c *WishlistAPIController) GetAll() {
-	entries := services.Wishlist().GetAll()
-	utils.SendSuccess(&c.Controller, entries)
+    entries := services.Wishlist().GetAll(c.getUsername())
+    utils.SendSuccess(&c.Controller, entries)
 }
 
-// Create handles POST /api/wishlist
 func (c *WishlistAPIController) Create() {
-	var req models.CreateWishlistRequest
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil {
-		utils.SendBadRequest(&c.Controller, "invalid JSON body")
-		return
-	}
+    var req models.CreateWishlistRequest
+    if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil {
+        utils.SendBadRequest(&c.Controller, "invalid JSON body")
+        return
+    }
 
-	// Warn client about duplicates but still allow creation
-	isDup := services.Wishlist().IsDuplicate(req.CountryName)
+    username := c.getUsername()
+    isDup    := services.Wishlist().IsDuplicate(username, req.CountryName)
+    entry, err := services.Wishlist().Create(username, &req)
+    if err != nil {
+        utils.SendBadRequest(&c.Controller, err.Error())
+        return
+    }
 
-	entry, err := services.Wishlist().Create(&req)
-	if err != nil {
-		utils.SendBadRequest(&c.Controller, err.Error())
-		return
-	}
-
-	resp := map[string]interface{}{
-		"entry":     entry,
-		"duplicate": isDup,
-	}
-	utils.SendCreated(&c.Controller, resp)
+    utils.SendCreated(&c.Controller, map[string]interface{}{
+        "entry":     entry,
+        "duplicate": isDup,
+    })
 }
 
-// Update handles PUT /api/wishlist/:id
 func (c *WishlistAPIController) Update() {
-	id := c.Ctx.Input.Param(":id")
-	if id == "" {
-		utils.SendBadRequest(&c.Controller, "id is required")
-		return
-	}
+    id := c.Ctx.Input.Param(":id")
+    if id == "" {
+        utils.SendBadRequest(&c.Controller, "id is required")
+        return
+    }
 
-	var req models.UpdateWishlistRequest
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil {
-		utils.SendBadRequest(&c.Controller, "invalid JSON body")
-		return
-	}
+    var req models.UpdateWishlistRequest
+    if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil {
+        utils.SendBadRequest(&c.Controller, "invalid JSON body")
+        return
+    }
 
-	entry, err := services.Wishlist().Update(id, &req)
-	if err != nil {
-		if err.Error() == "wishlist entry not found" {
-			utils.SendNotFound(&c.Controller, err.Error())
-			return
-		}
-		utils.SendBadRequest(&c.Controller, err.Error())
-		return
-	}
-	utils.SendSuccess(&c.Controller, entry)
+    entry, err := services.Wishlist().Update(c.getUsername(), id, &req)
+    if err != nil {
+        if err.Error() == "wishlist entry not found" {
+            utils.SendNotFound(&c.Controller, err.Error())
+            return
+        }
+        utils.SendBadRequest(&c.Controller, err.Error())
+        return
+    }
+    utils.SendSuccess(&c.Controller, entry)
 }
 
-// Delete handles DELETE /api/wishlist/:id
 func (c *WishlistAPIController) Delete() {
-	id := c.Ctx.Input.Param(":id")
-	if id == "" {
-		utils.SendBadRequest(&c.Controller, "id is required")
-		return
-	}
+    id := c.Ctx.Input.Param(":id")
+    if id == "" {
+        utils.SendBadRequest(&c.Controller, "id is required")
+        return
+    }
 
-	if err := services.Wishlist().Delete(id); err != nil {
-		utils.SendNotFound(&c.Controller, err.Error())
-		return
-	}
-	utils.SendSuccess(&c.Controller, map[string]string{"deleted": id})
+    if err := services.Wishlist().Delete(c.getUsername(), id); err != nil {
+        utils.SendNotFound(&c.Controller, err.Error())
+        return
+    }
+    utils.SendSuccess(&c.Controller, map[string]string{"deleted": id})
 }
