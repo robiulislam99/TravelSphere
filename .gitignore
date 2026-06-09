@@ -3,6 +3,7 @@
 
 # Compiled binaries
 travelsphere
+TravelSphere
 *.exe
 *.out
 
