@@ -1,0 +1,14 @@
+github.com/robiulislam99/TravelSphere/controllers/auth.go:11:		ShowLogin	0.0%
+github.com/robiulislam99/TravelSphere/controllers/auth.go:23:		DoLogin		0.0%
+github.com/robiulislam99/TravelSphere/controllers/auth.go:39:		Logout		0.0%
+github.com/robiulislam99/TravelSphere/controllers/base.go:16:		Prepare		100.0%
+github.com/robiulislam99/TravelSphere/controllers/country.go:19:	Prepare		100.0%
+github.com/robiulislam99/TravelSphere/controllers/country.go:26:	List		84.6%
+github.com/robiulislam99/TravelSphere/controllers/country.go:48:	Detail		23.1%
+github.com/robiulislam99/TravelSphere/controllers/dashboard.go:9:	Prepare		100.0%
+github.com/robiulislam99/TravelSphere/controllers/dashboard.go:15:	Get		100.0%
+github.com/robiulislam99/TravelSphere/controllers/home.go:15:		Prepare		100.0%
+github.com/robiulislam99/TravelSphere/controllers/home.go:21:		Get		80.0%
+github.com/robiulislam99/TravelSphere/controllers/wishlist.go:9:	Prepare		100.0%
+github.com/robiulislam99/TravelSphere/controllers/wishlist.go:15:	Get		100.0%
+total:									(statements)	60.6%
