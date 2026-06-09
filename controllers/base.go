@@ -21,4 +21,16 @@ func (c *BaseController) Prepare() {
 	c.Data["MetaDescription"] = "Discover destinations, explore attractions, and manage your travel wishlist."
 	c.Data["ActivePage"]      = ""
 	c.Data["PageScript"]      = ""
+
+	 // Session — inject into every template so header.tpl can show/hide nav items
+    username  := c.GetSession("username")
+    firstName := c.GetSession("first_name")
+
+    if username != nil && username != "" {
+        c.Data["LoggedIn"]  = true
+        c.Data["FirstName"] = firstName
+    } else {
+        c.Data["LoggedIn"]  = false
+        c.Data["FirstName"] = ""
+    }
 }

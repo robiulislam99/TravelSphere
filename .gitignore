@@ -24,4 +24,4 @@ coverage.html
 
 # Log files
 *.log
-logs/
+logs//TravelSphere

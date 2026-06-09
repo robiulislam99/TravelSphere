@@ -609,3 +609,31 @@ tbody tr:hover { background-color: var(--color-bg-muted); }
     font-size: 13px;
     color: var(--color-text-secondary);
 }
+
+/* ── Auth nav (login/logout) ─────────────────────────────────────── */
+.nav-auth {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: 1rem;
+}
+
+.nav-username {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+}
+
+.btn--sm {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+.btn--outline {
+    background: transparent;
+    border: 1.5px solid var(--color-border-primary);
+    color: var(--color-text-primary);
+}
+
+.btn--outline:hover {
+    background: var(--color-background-secondary);
+}
