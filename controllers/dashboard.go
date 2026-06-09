@@ -1,27 +1,29 @@
-// controllers/dashboard.go
-// DashboardController handles GET /dashboard (protected SSR page).
 package controllers
 
 import "github.com/robiulislam99/TravelSphere/services"
 
 type DashboardController struct {
-	BaseController
+    BaseController
 }
 
 func (c *DashboardController) Prepare() {
-	c.BaseController.Prepare()
-	c.Data["Title"] = "Dashboard"
-	c.Data["ActivePage"] = "dashboard"
+    c.BaseController.Prepare()
+    c.Data["Title"]      = "Dashboard"
+    c.Data["ActivePage"] = "dashboard"
 }
 
 func (c *DashboardController) Get() {
-	summary := services.Dashboard().GetSummary()
-	entries := services.Wishlist().GetAll()
+    username := ""
+    if u := c.GetSession("username"); u != nil {
+        username = u.(string)
+    }
 
-	c.Data["Summary"] = summary
-	c.Data["WishlistEntries"] = entries
-	c.Data["PageScript"] = "dashboard.js"
+    summary := services.Dashboard().GetSummary(username)
+    entries := services.Wishlist().GetAll(username)
 
-	c.Layout = "layout/base.tpl"
-	c.TplName = "pages/dashboard.tpl"
+    c.Data["Summary"]         = summary
+    c.Data["WishlistEntries"] = entries
+    c.Data["PageScript"]      = "dashboard.js"
+    c.Layout                  = "layout/base.tpl"
+    c.TplName                 = "pages/dashboard.tpl"
 }
