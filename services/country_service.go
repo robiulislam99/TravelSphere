@@ -1,11 +1,10 @@
 // services/country_service.go
-// CountryService orchestrates REST Countries API calls and transforms
+// CountryService orchestrates REST Countries v5 API calls and transforms
 // raw responses into application models. Controllers never touch the API
 // client directly — all logic lives here.
 package services
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -23,6 +22,12 @@ func NewCountryService() *CountryService {
 	return &CountryService{client: utils.NewRestCountriesClient()}
 }
 
+// NewCountryServiceWithClient creates a CountryService with a custom client.
+// Used in tests to inject a mock REST Countries client.
+func NewCountryServiceWithClient(client *utils.RestCountriesClient) *CountryService {
+	return &CountryService{client: client}
+}
+
 // GetAll returns all countries, optionally filtered by search query and/or region.
 // Both filters are case-insensitive. Empty strings mean "no filter".
 func (s *CountryService) GetAll(search, region string) ([]models.CountryListItem, error) {
@@ -37,11 +42,11 @@ func (s *CountryService) GetAll(search, region string) ([]models.CountryListItem
 	results := make([]models.CountryListItem, 0, len(raw))
 	for _, r := range raw {
 		// Region filter (exact match)
-		if region != "" && !strings.EqualFold(r.Region, region) {
+		if region != "" && !strings.EqualFold(r.Region(), region) {
 			continue
 		}
 		// Search filter (name contains query)
-		if search != "" && !strings.Contains(strings.ToLower(r.Name.Common), search) {
+		if search != "" && !strings.Contains(strings.ToLower(r.Name()), search) {
 			continue
 		}
 		results = append(results, s.toListItem(r))
@@ -65,7 +70,7 @@ func (s *CountryService) GetBySlug(slug string) (*models.Country, error) {
 
 	slug = strings.ToLower(strings.TrimSpace(slug))
 	for _, r := range raw {
-		if utils.NameToSlug(r.Name.Common) == slug {
+		if utils.NameToSlug(r.Name()) == slug {
 			c := s.toCountry(r)
 			return &c, nil
 		}
@@ -84,7 +89,7 @@ func (s *CountryService) GetFeatured() ([]models.CountryListItem, error) {
 
 	index := make(map[string]models.CountryListItem, len(raw))
 	for _, r := range raw {
-		index[r.CCA2] = s.toListItem(r)
+		index[r.CCA2()] = s.toListItem(r)
 	}
 
 	results := make([]models.CountryListItem, 0, len(featured))
@@ -98,25 +103,14 @@ func (s *CountryService) GetFeatured() ([]models.CountryListItem, error) {
 
 // --- Private transformation helpers ---
 
-// toCountry converts a RawCountry into a full models.Country.
-
+// toCountry converts a RawCountry (v5 map-based) into a full models.Country.
 func (s *CountryService) toCountry(r utils.RawCountry) models.Country {
-	capital := ""
-	if len(r.Capital) > 0 {
-		capital = r.Capital[0]
-	}
-
-	lat, lon := 0.0, 0.0
-	if len(r.Latlng) == 2 {
-		lat, lon = r.Latlng[0], r.Latlng[1]
-	}
-
-	// Build currency display string directly here
-	// to avoid anonymous struct type mismatch with formatter
-	currencyParts := []string{}
-	for code, cur := range r.Currencies {
-		if cur.Name != "" {
-			currencyParts = append(currencyParts, fmt.Sprintf("%s (%s)", code, cur.Name))
+	// Build currency display string e.g. "BDT (Bangladeshi taka), USD"
+	currencies := r.Currencies()
+	currencyParts := make([]string, 0, len(currencies))
+	for code, name := range currencies {
+		if name != "" && name != code {
+			currencyParts = append(currencyParts, code+" ("+name+")")
 		} else {
 			currencyParts = append(currencyParts, code)
 		}
@@ -126,22 +120,31 @@ func (s *CountryService) toCountry(r utils.RawCountry) models.Country {
 		currencyDisplay = strings.Join(currencyParts, ", ")
 	}
 
+	// Build language display string e.g. "Bengali, English"
+	languages := r.Languages()
+	languageDisplay := "N/A"
+	if len(languages) > 0 {
+		languageDisplay = strings.Join(languages, ", ")
+	}
+
+	name := r.Name()
+
 	return models.Country{
-		Name:                r.Name.Common,
-		Slug:                utils.NameToSlug(r.Name.Common),
-		CCA2:                r.CCA2,
-		CCA3:                r.CCA3,
-		Capital:             capital,
-		Region:              r.Region,
-		Subregion:           r.Subregion,
-		Population:          r.Population,
-		FormattedPopulation: utils.FormatPopulation(r.Population),
-		FlagURL:             r.Flags.PNG,
-		FlagEmoji:           r.Flag,
+		Name:                name,
+		Slug:                utils.NameToSlug(name),
+		CCA2:                r.CCA2(),
+		CCA3:                r.CCA3(),
+		Capital:             r.Capital(),
+		Region:              r.Region(),
+		Subregion:           r.Subregion(),
+		Population:          r.Population(),
+		FormattedPopulation: utils.FormatPopulation(r.Population()),
+		FlagURL:             r.FlagPNG(),
+		FlagEmoji:           r.FlagEmoji(),
 		CurrencyDisplay:     currencyDisplay,
-		LanguageDisplay:     utils.FormatLanguages(r.Languages),
-		Latitude:            lat,
-		Longitude:           lon,
+		LanguageDisplay:     languageDisplay,
+		Latitude:            r.Latitude(),
+		Longitude:           r.Longitude(),
 	}
 }
 
