@@ -1,17 +1,5 @@
 // utils/rest_countries_client.go
-//
-// REST Countries v5 client.
-// Docs: https://restcountries.com/docs
-//
-// Strategy: request FULL nested country objects (using response_fields_omit
-// to drop only the heavy names.translations/leaders branches) instead of
-// response_fields allowlists. This avoids any ambiguity around whether v5
-// flattens dot-paths — the documented per-field shapes (names.common,
-// codes.alpha_2, capitals[], currencies{}, languages[], coordinates{}) are
-// guaranteed nested as described in the Field Reference.
-//
-// Flags come from the dedicated Flags CDN (no auth, always available):
-//   https://flags.restcountries.com/v5/w320/{alpha2-lowercase}.png
+
 package utils
 
 import (
