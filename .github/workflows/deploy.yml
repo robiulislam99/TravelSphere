@@ -6,7 +6,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}   # e.g. robiulislam99/travelsphere
+  IMAGE_NAME: ${{ github.repository_owner }}/travelsphere   # lowercase only
 
 jobs:
   build-and-push:
