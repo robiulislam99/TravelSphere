@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/robiulislam99/TravelSphere/models"
 )
@@ -385,6 +386,10 @@ func TestGetAll_SortingNewestFirst(t *testing.T) {
 		Status:      string(models.StatusPlanned),
 	}
 	entry1, _ := service.Create("testuser", req1)
+
+	// Ensure the two entries get distinct CreatedAt timestamps so
+	// GetAll's newest-first sort is deterministic.
+	time.Sleep(time.Millisecond)
 
 	// Create second entry
 	req2 := &models.CreateWishlistRequest{

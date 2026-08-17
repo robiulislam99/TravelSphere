@@ -1,6 +1,7 @@
 package services
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
@@ -168,8 +169,11 @@ func TestCountryService_WhitespaceHandling(t *testing.T) {
 func TestCountryService_SortingLogic(t *testing.T) {
 	// Verify the sorting logic would work correctly
 	countries := []string{"Zebra", "Apple", "Mango", "Banana"}
-	
+
 	// Simulate the sort.Slice that CountryService uses
+	sort.Slice(countries, func(i, j int) bool {
+		return countries[i] < countries[j]
+	})
 	for i := 0; i < len(countries)-1; i++ {
 		if countries[i] > countries[i+1] {
 			t.Errorf("Countries not in order: %s should come before %s", countries[i+1], countries[i])

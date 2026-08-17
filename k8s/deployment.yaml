@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: travelsphere
+  namespace: travelsphere
+  labels:
+    app: travelsphere
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: travelsphere
+  template:
+    metadata:
+      labels:
+        app: travelsphere
+    spec:
+      containers:
+        - name: travelsphere
+          image: ghcr.io/robiulislam99/travelsphere:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: travelsphere-secrets
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      imagePullSecrets:
+        - name: ghcr-secret

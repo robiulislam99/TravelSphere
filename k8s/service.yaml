@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: travelsphere
+  namespace: travelsphere
+spec:
+  selector:
+    app: travelsphere
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP
