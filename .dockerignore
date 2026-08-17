@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+travelsphere-linux
+TravelSphere.exe
+*.log
+auth_coverage.html
+coverage_report.txt
+Dockerfile
+k8s
+.github
