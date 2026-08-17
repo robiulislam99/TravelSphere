@@ -48,40 +48,19 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: self-hosted   # <-- runner installed on your VM (see setup below)
-    env:
-      KUBECONFIG: $HOME/.kube/config
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up kubeconfig
-        env:
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-        run: |
-          # Keep existing kubeconfig if it already reaches the cluster.
-          if kubectl get nodes --request-timeout=5s >/dev/null 2>&1; then
-            echo "Existing kubeconfig is valid — keeping it."
-          elif [ -n "$KUBE_CONFIG" ]; then
-            mkdir -p $HOME/.kube
-            # Support both base64-encoded and raw kubeconfig content
-            if echo "$KUBE_CONFIG" | base64 -d > /tmp/kubecheck 2>/dev/null && grep -q "apiVersion" /tmp/kubecheck; then
-              mv /tmp/kubecheck $HOME/.kube/config
-            else
-              echo "$KUBE_CONFIG" > $HOME/.kube/config
-            fi
-            chmod 600 $HOME/.kube/config
-          else
-            echo "No working kubeconfig or KUBE_CONFIG secret." && exit 1
-          fi
-
       - name: Verify cluster access
         run: |
-          mkdir -p $HOME/.kube
-          chmod 600 $HOME/.kube/config 2>/dev/null || true
+          export KUBECONFIG="$HOME/.kube/config"
+          mkdir -p "$HOME/.kube"
           kubectl get nodes
 
       - name: Apply namespace and manifests
         run: |
+          export KUBECONFIG="$HOME/.kube/config"
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/service.yaml
           kubectl apply -f k8s/deployment.yaml
@@ -89,6 +68,7 @@ jobs:
 
       - name: Update image and roll out
         run: |
+          export KUBECONFIG="$HOME/.kube/config"
           kubectl set image deployment/travelsphere \
             travelsphere=${{ needs.build-and-push.outputs.image_tag }} \
             -n travelsphere
