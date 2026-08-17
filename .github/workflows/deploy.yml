@@ -58,7 +58,10 @@ jobs:
         env:
           KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         run: |
-          if [ -n "$KUBE_CONFIG" ]; then
+          # Keep existing kubeconfig if it already reaches the cluster.
+          if kubectl get nodes --request-timeout=5s >/dev/null 2>&1; then
+            echo "Existing kubeconfig is valid — keeping it."
+          elif [ -n "$KUBE_CONFIG" ]; then
             mkdir -p $HOME/.kube
             # Support both base64-encoded and raw kubeconfig content
             if echo "$KUBE_CONFIG" | base64 -d > /tmp/kubecheck 2>/dev/null && grep -q "apiVersion" /tmp/kubecheck; then
@@ -67,6 +70,8 @@ jobs:
               echo "$KUBE_CONFIG" > $HOME/.kube/config
             fi
             chmod 600 $HOME/.kube/config
+          else
+            echo "No working kubeconfig or KUBE_CONFIG secret." && exit 1
           fi
 
       - name: Verify cluster access
