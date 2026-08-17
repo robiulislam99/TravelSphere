@@ -60,7 +60,12 @@ jobs:
         run: |
           if [ -n "$KUBE_CONFIG" ]; then
             mkdir -p $HOME/.kube
-            echo "$KUBE_CONFIG" | base64 -d > $HOME/.kube/config
+            # Support both base64-encoded and raw kubeconfig content
+            if echo "$KUBE_CONFIG" | base64 -d > /tmp/kubecheck 2>/dev/null && grep -q "apiVersion" /tmp/kubecheck; then
+              mv /tmp/kubecheck $HOME/.kube/config
+            else
+              echo "$KUBE_CONFIG" > $HOME/.kube/config
+            fi
             chmod 600 $HOME/.kube/config
           fi
 
