@@ -48,15 +48,24 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: self-hosted   # <-- runner installed on your VM (see setup below)
+    env:
+      KUBECONFIG: $HOME/.kube/config
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up kubeconfig
+        if: secrets.KUBE_CONFIG != ''
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
+
+      - name: Verify cluster access
+        run: |
+          mkdir -p $HOME/.kube
+          chmod 600 $HOME/.kube/config 2>/dev/null || true
+          kubectl get nodes
 
       - name: Apply namespace and manifests
         run: |
